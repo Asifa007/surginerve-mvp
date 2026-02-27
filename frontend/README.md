@@ -1,24 +1,48 @@
-# Welcome to your Lovable project
+# Welcome to SurgiNerve MVP
+SurgiNerve is a medical dashboard MVP designed to provide a clean, responsive interface for managing healthcare-related data.
+This project consists of a React frontend and a FastAPI backend.
 
-## Project info
+## What technologies are used for this project?
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+  - Frontend
+  - React
+  - TypeScript
+  - Vite
+  - Tailwind CSS
+  - shadcn-ui
+  - Backend
+  - FastAPI
+  - PostgreSQL
+  - SQLAlchemy
 
-## How can I edit this code?
+**📁 Project Structure**
 
-There are several ways of editing your application.
+surginerve-mvp/
+│
+├── frontend/              # React application
+├── backend/               # Backend root
+│   └── surginerve-backend/
+│       └── app/           # FastAPI source code
+└── README.md
 
-**Use Lovable**
+**⚙️ Running the Project Locally**
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+1️⃣ Frontend
+Copy code
 
-Changes made via Lovable will be committed automatically to this repo.
+cd frontend
+npm install
+npm run dev
+The frontend will run on: http://localhost:8080⁠/
 
-**Use your preferred IDE**
+2️⃣ Backend
+Copy code
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+cd backend/surginerve-backend
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+The backend will run on: http://127.0.0.1:8000⁠/
+API Docs: http://127.0.0.1:8000/docs⁠/
 
 Follow these steps:
 
@@ -50,24 +74,4 @@ npm run dev
 - Click on "New codespace" to launch a new Codespace environment.
 - Edit files directly within the Codespace and commit and push your changes once you're done.
 
-## What technologies are used for this project?
 
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
