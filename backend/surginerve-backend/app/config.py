@@ -16,9 +16,10 @@ class Settings(BaseSettings):
 
     # CORS – allow the frontend origin
     ALLOWED_ORIGINS: list[str] = [
-        "https://surginerve-guardian.lovable.app",
-        "http://localhost:3000",
-        "http://localhost:5173",
+    "https://surginerve-guardian.lovable.app",
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://localhost:8080",  # <-- ADD THIS
     ]
 
     # ML
