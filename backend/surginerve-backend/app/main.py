@@ -3,7 +3,6 @@ SurgiNerve – FastAPI application entry point
 """
 
 import logging
-import asyncio
 import random
 
 from fastapi import FastAPI, Request
@@ -12,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
-from app.database import Base, engine
+from app.database import Base, engine, SessionLocal
 from app.middleware.exception_handler import global_exception_handler
 from app.routes import predictions, robots, sensor_readings
 
@@ -39,7 +38,7 @@ app = FastAPI(
 # ── CORS ──────────────────────────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_origins=["*"],  # temporarily allow all for production testing
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -64,87 +63,69 @@ app.include_router(predictions.router)
 
 
 # ───────────────────────────────────────────────────────────────────────────────
-# 🔥 REAL-TIME BACKEND SENSOR SIMULATION WITH DATABASE STORAGE
+# 🔥 CLOUD-SAFE SENSOR GENERATION
+# Instead of background infinite loop, generate data when requested
 # ───────────────────────────────────────────────────────────────────────────────
 
-async def simulate_sensor_stream():
+def generate_sensor_data():
     """
-    Simulates real-time IoT sensor data every 5 seconds.
-    Stores both sensor readings and predictions in database.
+    Generates ONE new sensor reading + prediction.
+    Called on-demand (cloud-safe).
     """
 
-    await asyncio.sleep(5)  # allow app to fully start
+    from app.models.db_models import SensorReading, Prediction, Robot
+    from app.ml.predict import predict_failure
 
-    while True:
+    db = SessionLocal()
 
-        # 🔹 Lazy imports to avoid circular imports
-        from app.database import SessionLocal
-        from app.models.db_models import SensorReading, Prediction, Robot
-        from app.ml.predict import predict_failure
+    try:
+        robot = db.query(Robot).first()
+        if not robot:
+            logger.warning("No robot found. Create one using POST /robots/")
+            return
 
-        db = SessionLocal()
+        temperature = round(random.uniform(35, 75), 2)
+        vibration = round(random.uniform(0.1, 1.5), 2)
+        current = round(random.uniform(1.0, 5.0), 2)
 
-        try:
-            robot = db.query(Robot).first()
+        sensor = SensorReading(
+            robot_id=robot.id,
+            temperature=temperature,
+            vibration=vibration,
+            current=current,
+        )
+        db.add(sensor)
+        db.flush()
 
-            if not robot:
-                logger.warning("No robot found. Create one using POST /robots/")
-                db.close()
-                await asyncio.sleep(5)
-                continue
+        result = predict_failure(
+            temperature=temperature,
+            vibration=vibration,
+            current=current,
+        )
 
-            # Generate simulated values
-            temperature = round(random.uniform(35, 75), 2)
-            vibration = round(random.uniform(0.1, 1.5), 2)
-            current = round(random.uniform(1.0, 5.0), 2)
+        prediction = Prediction(
+            robot_id=robot.id,
+            failure_probability=result["failure_probability"],
+            risk_level=result["risk_level"],
+            explanation=result["explanation"],
+        )
 
-            # Save sensor reading
-            sensor = SensorReading(
-                robot_id=robot.id,
-                temperature=temperature,
-                vibration=vibration,
-                current=current,
-            )
+        db.add(prediction)
+        db.commit()
 
-            db.add(sensor)
-            db.flush()
+        logger.info(
+            f"[GENERATED] Temp={temperature} | Vib={vibration} | "
+            f"Curr={current} | Risk={result['risk_level']}"
+        )
 
-            # Run ML prediction
-            result = predict_failure(
-                temperature=temperature,
-                vibration=vibration,
-                current=current,
-            )
-
-            # Save prediction
-            prediction = Prediction(
-                robot_id=robot.id,
-                failure_probability=result["failure_probability"],
-                risk_level=result["risk_level"],
-                explanation=result["explanation"],
-            )
-
-            db.add(prediction)
-            db.commit()
-
-            logger.info(
-                f"[SIMULATION] Robot={robot.robot_name} | "
-                f"Temp={temperature} | Vib={vibration} | Curr={current} | "
-                f"Risk={result['risk_level']} | "
-                f"Prob={result['failure_probability']}"
-            )
-
-        except Exception as e:
-            db.rollback()
-            logger.error(f"Simulation DB error: {e}")
-
-        finally:
-            db.close()
-
-        await asyncio.sleep(5)
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Generation error: {e}")
+    finally:
+        db.close()
 
 
-# ── Startup / Shutdown ────────────────────────────────────────────────────────
+# ── Startup ───────────────────────────────────────────────────────────────────
 @app.on_event("startup")
 async def startup_event():
     logger.info("Starting %s v%s", settings.APP_NAME, settings.APP_VERSION)
@@ -158,18 +139,18 @@ async def startup_event():
         get_model()
         logger.info("ML model loaded successfully.")
     except FileNotFoundError:
-        logger.warning(
-            "Model file not found. Run 'python -m app.ml.train_model' first."
-        )
-
-    # Start simulation task
-    asyncio.create_task(simulate_sensor_stream())
-    logger.info("Real-time sensor simulation started.")
+        logger.warning("Model file not found.")
 
 
-@app.on_event("shutdown")
-async def shutdown_event():
-    logger.info("%s shutting down.", settings.APP_NAME)
+# ── Auto-generate data when frontend requests predictions ─────────────────────
+@app.get("/auto-generate")
+def auto_generate():
+    """
+    Frontend can call this endpoint every few seconds.
+    It generates fresh data.
+    """
+    generate_sensor_data()
+    return {"message": "New sensor data generated"}
 
 
 # ── Health Endpoints ──────────────────────────────────────────────────────────
